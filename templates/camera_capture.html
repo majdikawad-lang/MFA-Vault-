@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}Biometric Capture{% endblock %}
+
+{% block content %}
+<div class="glass-panel" style="max-width: 600px; margin: 0 auto; text-align: center;">
+    <h2>{{ "Setup" if action == 'enroll' else "Verify" }} {{ "Hand" if bio_type == 'hand' else "Face" }}</h2>
+    <p id="status-text" style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 1.2rem; font-weight: bold;">Initializing camera...</p>
+    
+    <div style="position: relative; width: 100%; max-width: 500px; margin: 0 auto; border-radius: 12px; overflow: hidden; background: #000;">
+        <video id="videoElement" autoplay playsinline style="width: 100%; transform: scaleX(-1);"></video>
+        <canvas id="canvasElement" style="display: none;"></canvas>
+    </div>
+    
+    <div style="margin-top: 1.5rem;">
+        {% if bio_type == 'face' and action == 'enroll' %}
+            <button id="saveBtn" class="btn-primary" style="display: inline-block; margin-right: 1rem; padding: 0.8rem 2rem;">Save Face</button>
+        {% endif %}
+        <a href="{{ url_for('main.profile') if action == 'enroll' else url_for('biometric.biometric_verify') }}" class="btn-secondary" style="display: inline-block; padding: 0.8rem 2rem;">Cancel</a>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('videoElement');
+    const canvas = document.getElementById('canvasElement');
+    const statusText = document.getElementById('status-text');
+    const saveBtn = document.getElementById('saveBtn');
+    
+    const bioType = "{{ bio_type }}";
+    const action = "{{ action }}";
+    let isProcessing = false;
+    let manualSaveTriggered = false;
+    let captureInterval = null;
+    
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            manualSaveTriggered = true;
+            statusText.innerText = "Capturing...";
+        });
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+        .then(stream => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                statusText.innerText = "Camera ready. Processing...";
+                captureInterval = setInterval(captureAndSend, 400); // 400ms for responsiveness
+            };
+        })
+        .catch(err => {
+            statusText.innerText = "Error accessing camera. Please allow camera permissions.";
+            console.error(err);
+        });
+
+    function captureAndSend() {
+        if (isProcessing) return;
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        if(canvas.width === 0) return;
+        
+        const ctx = canvas.getContext('2d');
+        // Mirror the canvas to match video display
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
+        isProcessing = true;
+        fetch("{{ url_for('biometric.process_frame') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image: dataUrl,
+                bio_type: bioType,
+                action: action,
+                save_triggered: manualSaveTriggered
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            isProcessing = false;
+            manualSaveTriggered = false; // Reset trigger
+            
+            if (data.message) {
+                statusText.innerText = data.message;
+            }
+            if (data.status === 'success') {
+                statusText.style.color = "var(--success)";
+                clearInterval(captureInterval);
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1000);
+            } else if (data.status === 'failed') {
+                statusText.style.color = "var(--danger)";
+                clearInterval(captureInterval);
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+            }
+        })
+        .catch(err => {
+            isProcessing = false;
+            console.error(err);
+        });
+    }
+</script>
+{% endblock %}

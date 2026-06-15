@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - MFA System{% endblock %}
+
+{% block content %}
+<h2 style="font-size: 1.5rem;">Welcome, {{ user.name }}</h2>
+
+<div class="profile-card" style="text-align: center; margin-top: 30px;">
+    {% if not user.is_admin %}
+    <p style="margin-bottom: 20px; color: var(--text-secondary);">You have successfully completed multi-factor authentication.</p>
+    {% else %}
+    <p style="margin-bottom: 20px; color: var(--text-secondary);">Administrator Access Granted.</p>
+    {% endif %}
+    
+    <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+        {% if user.is_admin %}
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-warning" style="text-decoration: none; display: inline-block; width: auto; padding: 12px 24px; background: rgba(255,193,7,0.2); color: #ffc107; border: 1px solid rgba(255,193,7,0.5);">Admin Panel</a>
+        {% endif %}
+        <a href="{{ url_for('main.profile') }}" class="btn btn-primary" style="text-decoration: none; display: inline-block; width: auto; padding: 12px 24px;">My Profile</a>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-danger" style="text-decoration: none; display: inline-block; width: auto; padding: 12px 24px;">Logout</a>
+    </div>
+</div>
+{% endblock %}

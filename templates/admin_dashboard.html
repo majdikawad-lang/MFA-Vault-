@@ -1,0 +1,386 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard - MFA Vault{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>System Administration</h2>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        <!-- Notification Bell Button -->
+        <div style="position: relative; display: inline-block;">
+            <button id="notificationBellBtn" class="btn-secondary" style="background: var(--bg-panel); border: 1px solid var(--border); padding: 0.8rem 1rem; border-radius: 0.5rem; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: bold; position: relative; height: 100%;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span id="notificationBadge" style="position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.7rem; display: none; align-items: center; justify-content: center; font-weight: 800;">0</span>
+            </button>
+            
+            <!-- Notification Dropdown Menu -->
+            <div id="notificationDropdown" style="display: none; position: absolute; right: 0; top: 120%; width: 350px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 0.75rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 1000; overflow: hidden; max-height: 400px; display: flex; flex-direction: column;">
+                <div style="padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+                    <h4 style="margin: 0; font-size: 1rem; color: var(--text-primary);">Critical Alerts</h4>
+                    <button onclick="clearAllNotifications()" style="background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem;">Dismiss All</button>
+                </div>
+                <div id="notificationList" style="overflow-y: auto; flex: 1; text-align: left;">
+                    <!-- Dynamic alert items go here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div style="display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
+    <div class="glass-panel" style="flex: 1; min-width: 200px; padding: 1.5rem; text-align: center;">
+        <h3 style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 1rem;">Total Users</h3>
+        <p style="font-size: 2.5rem; font-weight: bold; color: var(--accent);">{{ total_users }}</p>
+    </div>
+    <div class="glass-panel" style="flex: 1; min-width: 200px; padding: 1.5rem; text-align: center;">
+        <h3 style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 1rem;">Failed Logins</h3>
+        <p style="font-size: 2.5rem; font-weight: bold; color: var(--danger);">{{ failed_logins }}</p>
+    </div>
+    <div class="glass-panel" style="flex: 1; min-width: 200px; padding: 1.5rem; text-align: center;">
+        <h3 style="color: var(--text-secondary); margin-bottom: 0.5rem; font-size: 1rem;">Total Vault Storage</h3>
+        <p style="font-size: 2.5rem; font-weight: bold; color: var(--success);">{{ total_storage_mb }}<span style="font-size:1rem;">MB</span></p>
+    </div>
+</div>
+
+<div class="glass-panel-large">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+        <h3 style="margin: 0; color: var(--text-secondary);">System Activity Log</h3>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+            <div style="position: relative;">
+                <input type="text" id="logSearchInput" placeholder="Search event details, email..." class="form-control" style="width: 250px; padding: 0.6rem 1rem 0.6rem 2.2rem; font-size: 0.85rem; border-radius: 0.5rem; background: var(--bg-dark); height: auto; margin: 0;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="2" style="position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); pointer-events: none;">
+                    <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
+            <select id="logLevelFilter" class="form-control" style="width: 140px; padding: 0.6rem 1rem; font-size: 0.85rem; border-radius: 0.5rem; background: var(--bg-dark); cursor: pointer; height: auto; margin: 0;">
+                <option value="ALL">All Levels</option>
+                <option value="INFO">INFO</option>
+                <option value="WARNING">WARNING</option>
+                <option value="ERROR">ERROR</option>
+                <option value="CRITICAL">CRITICAL</option>
+            </select>
+        </div>
+    </div>
+    
+    <div style="max-height: 400px; overflow-y: auto; text-align: left;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                    <th style="padding: 1rem; text-align: left;">Time</th>
+                    <th style="padding: 1rem; text-align: left;">Level</th>
+                    <th style="padding: 1rem; text-align: left;">Event</th>
+                    <th style="padding: 1rem; text-align: left;">User Target</th>
+                    <th style="padding: 1rem; text-align: left;">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 1rem; color: var(--text-secondary);">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td style="padding: 1rem;">
+                        {% if log.level == 'ERROR' or log.level == 'CRITICAL' %}
+                            <span style="color: var(--danger); font-weight: bold; background: rgba(239, 68, 68, 0.1); padding: 0.25rem 0.5rem; border-radius: 0.25rem;">{{ log.level }}</span>
+                        {% elif log.level == 'WARNING' %}
+                            <span style="color: var(--warning); font-weight: bold; background: rgba(245, 158, 11, 0.1); padding: 0.25rem 0.5rem; border-radius: 0.25rem;">{{ log.level }}</span>
+                        {% else %}
+                            <span style="color: var(--success); background: rgba(16, 185, 129, 0.1); padding: 0.25rem 0.5rem; border-radius: 0.25rem;">{{ log.level }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem; font-weight: 500;">{{ log.event_type }}</td>
+                    <td style="padding: 1rem; color: var(--accent);">{{ log.target_email or 'N/A' }}</td>
+                    <td style="padding: 1rem;">{{ log.message }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No logs available yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="glass-panel-large" style="margin-top: 2rem;">
+    <h3 style="margin-bottom: 1.5rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">User Management</h3>
+    
+    <div style="max-height: 400px; overflow-y: auto; text-align: left;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <thead>
+                <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary);">
+                    <th style="padding: 1rem; text-align: left;">ID</th>
+                    <th style="padding: 1rem; text-align: left;">Name</th>
+                    <th style="padding: 1rem; text-align: left;">Email</th>
+                    <th style="padding: 1rem; text-align: left;">Storage Used</th>
+                    <th style="padding: 1rem; text-align: left;">Status</th>
+                    <th style="padding: 1rem; text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in all_users %}
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                    <td style="padding: 1rem; color: var(--text-secondary);">{{ u.id }}</td>
+                    <td style="padding: 1rem; font-weight: 500;">{{ u.name }}</td>
+                    <td style="padding: 1rem; color: var(--accent);">{{ u.email }}</td>
+                    <td style="padding: 1rem;">{{ (u.storage_used / (1024*1024))|round(2) }} MB</td>
+                    <td style="padding: 1rem;">
+                        {% if u.is_suspended %}
+                            <span style="color: var(--danger); font-weight: bold; background: rgba(239, 68, 68, 0.1); padding: 0.25rem 0.5rem; border-radius: 0.25rem;">Suspended</span>
+                        {% else %}
+                            <span style="color: var(--success); font-weight: bold; background: rgba(16, 185, 129, 0.1); padding: 0.25rem 0.5rem; border-radius: 0.25rem;">Active</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 1rem; text-align: right;">
+                        {% if u.id == user.id %}
+                            <span style="color: var(--text-secondary); font-style: italic;">Current Admin</span>
+                        {% else %}
+                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                {% if u.is_suspended %}
+                                    <form method="POST" action="{{ url_for('admin.unsuspend_user', user_id=u.id) }}" style="display:inline;">
+                                        <button type="submit" class="btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid var(--success);">Reactivate</button>
+                                    </form>
+                                {% else %}
+                                    <form method="POST" action="{{ url_for('admin.suspend_user', user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to suspend this user?');">
+                                        <button type="submit" class="btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger);">Suspend</button>
+                                    </form>
+                                {% endif %}
+                                <form method="POST" action="{{ url_for('admin.delete_user', del_user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this user and all their stored items?');">
+                                    <button type="submit" class="btn-secondary btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Delete Account</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- SMTP Settings Configuration Panel -->
+<div class="glass-panel-large" style="margin-top: 2rem; margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1.5rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">System SMTP Configuration (For Direct Emails & OTPs)</h3>
+    <form method="POST" action="{{ url_for('admin.smtp_settings') }}">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; text-align: left;">
+            <div class="form-group">
+                <label style="color: var(--text-secondary);">SMTP Server</label>
+                <input type="text" name="smtp_server" class="form-control" required placeholder="e.g. smtp.gmail.com" value="{{ smtp_config.smtp_server if smtp_config else 'smtp.gmail.com' }}">
+            </div>
+            <div class="form-group">
+                <label style="color: var(--text-secondary);">SMTP Port</label>
+                <input type="number" name="smtp_port" class="form-control" required placeholder="e.g. 465" value="{{ smtp_config.smtp_port if smtp_config else 465 }}">
+            </div>
+            <div class="form-group">
+                <label style="color: var(--text-secondary);">Sender Email</label>
+                <input type="email" name="sender_email" class="form-control" required placeholder="e.g. your_gmail@gmail.com" value="{{ smtp_config.sender_email if smtp_config else 'YOUR_EMAIL@gmail.com' }}">
+            </div>
+            <div class="form-group">
+                <label style="color: var(--text-secondary);">App Password</label>
+                <input type="password" name="app_password" class="form-control" required placeholder="Gmail App Password" value="{{ smtp_config.app_password if smtp_config else 'YOUR_APP_PASSWORD' }}">
+            </div>
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; text-align: left;">
+            <input type="checkbox" name="use_ssl" id="use_ssl" style="width: auto; margin: 0;" {% if not smtp_config or smtp_config.use_ssl %}checked{% endif %}>
+            <label for="use_ssl" style="margin-bottom: 0; cursor: pointer; color: var(--text-secondary);">Use SSL (Recommended for port 465)</label>
+        </div>
+        <button type="submit" class="btn-primary" style="padding: 0.8rem 2rem;">Save SMTP Configurations</button>
+    </form>
+</div>
+
+
+
+<script>
+function togglePw(id) {
+    let el = document.getElementById(id);
+    if(el.type === 'password') el.type = 'text';
+    else el.type = 'password';
+}
+
+// Critical Logs data from Jinja
+const criticalLogs = [
+    {% for log in logs if log.level in ['WARNING', 'ERROR', 'CRITICAL'] %}
+    {
+        id: {{ log.id }},
+        timestamp: "{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}",
+        level: "{{ log.level }}",
+        event_type: "{{ log.event_type }}",
+        email: "{{ log.target_email or 'N/A' }}",
+        message: "{{ log.message|escape }}"
+    },
+    {% endfor %}
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Notification Dropdown Toggle
+    const bellBtn = document.getElementById('notificationBellBtn');
+    const dropdown = document.getElementById('notificationDropdown');
+    
+    if (bellBtn && dropdown) {
+        bellBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdown.style.display = dropdown.style.display === 'none' ? 'flex' : 'none';
+        });
+        
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target) && e.target !== bellBtn && !bellBtn.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+        
+        renderNotifications();
+    }
+    
+    // 2. Real-time Log Filtering
+    const searchInput = document.getElementById('logSearchInput');
+    const levelFilter = document.getElementById('logLevelFilter');
+    const tableBody = document.querySelector('.glass-panel-large tbody');
+    
+    if (searchInput && levelFilter && tableBody) {
+        function filterLogs() {
+            const query = searchInput.value.toLowerCase().trim();
+            const selectedLevel = levelFilter.value;
+            const rows = tableBody.querySelectorAll('tr');
+            
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                // Skip the "No matching logs" row
+                if (row.id === 'noMatchingLogsRow') return;
+                
+                // If it's the default "No logs available" row, skip
+                if (row.cells.length === 1 && row.cells[0].getAttribute('colspan') === '5') {
+                    return;
+                }
+                
+                const levelSpan = row.cells[1].querySelector('span');
+                const levelText = levelSpan ? levelSpan.textContent.trim() : '';
+                const eventText = row.cells[2].textContent.toLowerCase();
+                const userText = row.cells[3].textContent.toLowerCase();
+                const detailsText = row.cells[4].textContent.toLowerCase();
+                
+                const matchesSearch = eventText.includes(query) || userText.includes(query) || detailsText.includes(query);
+                const matchesLevel = (selectedLevel === 'ALL') || (levelText === selectedLevel);
+                
+                if (matchesSearch && matchesLevel) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            let noMatchRow = document.getElementById('noMatchingLogsRow');
+            if (visibleCount === 0) {
+                if (!noMatchRow) {
+                    noMatchRow = document.createElement('tr');
+                    noMatchRow.id = 'noMatchingLogsRow';
+                    noMatchRow.innerHTML = `
+                        <td colspan="5" style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                            No logs match the current search filters.
+                        </td>
+                    `;
+                    tableBody.appendChild(noMatchRow);
+                } else {
+                    noMatchRow.style.display = '';
+                }
+            } else {
+                if (noMatchRow) {
+                    noMatchRow.style.display = 'none';
+                }
+            }
+        }
+        
+        searchInput.addEventListener('input', filterLogs);
+        levelFilter.addEventListener('change', filterLogs);
+    }
+});
+
+function getDismissedNotifications() {
+    const dismissed = localStorage.getItem('dismissed_notifications');
+    return dismissed ? JSON.parse(dismissed) : [];
+}
+
+function renderNotifications() {
+    const dismissed = getDismissedNotifications();
+    const activeAlerts = criticalLogs.filter(log => !dismissed.includes(log.id));
+    
+    const badge = document.getElementById('notificationBadge');
+    if (activeAlerts.length > 0) {
+        badge.textContent = activeAlerts.length;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
+    
+    const listContainer = document.getElementById('notificationList');
+    if (listContainer) {
+        listContainer.innerHTML = '';
+        
+        if (activeAlerts.length === 0) {
+            listContainer.innerHTML = `
+                <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; opacity: 0.5;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    <div>No new critical alerts.</div>
+                </div>
+            `;
+            return;
+        }
+        
+        activeAlerts.forEach(log => {
+            let alertColor = 'var(--warning)';
+            let bgClass = 'rgba(245, 158, 11, 0.1)';
+            if (log.level === 'CRITICAL' || log.level === 'ERROR') {
+                alertColor = 'var(--danger)';
+                bgClass = 'rgba(239, 68, 68, 0.1)';
+            }
+            
+            const item = document.createElement('div');
+            item.style.padding = '0.8rem 1rem';
+            item.style.borderBottom = '1px solid var(--border)';
+            item.style.display = 'flex';
+            item.style.flexDirection = 'column';
+            item.style.gap = '0.25rem';
+            item.style.position = 'relative';
+            item.style.background = 'rgba(255,255,255,0.02)';
+            
+            item.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 0.85rem; color: ${alertColor}; background: ${bgClass}; padding: 0.1rem 0.4rem; border-radius: 0.25rem;">
+                        ${log.level}: ${log.event_type}
+                    </span>
+                    <button onclick="dismissNotification(${log.id})" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.1rem; padding: 0 0.2rem; line-height: 1;">&times;</button>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-primary); margin-top: 0.25rem;">${log.message}</div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                    <span>User: ${log.email}</span>
+                    <span>${log.timestamp}</span>
+                </div>
+            `;
+            listContainer.appendChild(item);
+        });
+    }
+}
+
+function dismissNotification(id) {
+    const dismissed = getDismissedNotifications();
+    dismissed.push(id);
+    localStorage.setItem('dismissed_notifications', JSON.stringify(dismissed));
+    renderNotifications();
+}
+
+function clearAllNotifications() {
+    const dismissed = getDismissedNotifications();
+    criticalLogs.forEach(log => {
+        if (!dismissed.includes(log.id)) {
+            dismissed.push(log.id);
+        }
+    });
+    localStorage.setItem('dismissed_notifications', JSON.stringify(dismissed));
+    renderNotifications();
+}
+</script>
+{% endblock %}

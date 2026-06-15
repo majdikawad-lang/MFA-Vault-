@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} - MFA System{% endblock %}
+
+{% block content %}
+<h2>Email Verification</h2>
+<form method="POST" action="{{ action_url }}">
+    <div class="form-group">
+        <label>Enter 6-digit OTP sent to your email</label>
+        <input type="text" name="otp" class="form-control" required placeholder="123456" pattern="\d{6}" maxlength="6" style="text-align: center; font-size: 1.5rem; letter-spacing: 5px;">
+    </div>
+    <button type="submit" class="btn btn-primary">Verify OTP</button>
+</form>
+{% endblock %}
